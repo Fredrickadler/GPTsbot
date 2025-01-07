@@ -1,20 +1,19 @@
 import os
 import telebot
-import openai
+from flask import Flask, request
 
-# Load environment variables from config.txt
+# Load configuration
 with open("config.txt") as f:
     config = {}
     for line in f:
         key, value = line.strip().split("=", 1)
         config[key] = value
 
-# Initialize APIs
 BOT_TOKEN = config["BOT_TOKEN"]
-OPENAI_API_KEY = config["OPENAI_API_KEY"]
+WEBHOOK_URL = config["WEBHOOK_URL"]
 
-openai.api_key = OPENAI_API_KEY
 bot = telebot.TeleBot(BOT_TOKEN)
+app = Flask(__name__)
 
 # Handle "/start" command
 @bot.message_handler(commands=['start'])
@@ -25,19 +24,19 @@ def send_welcome(message):
 @bot.message_handler(func=lambda message: True)
 def handle_message(message):
     try:
-        # Send user message to OpenAI
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": message.text}]
-        )
-        
-        # Get the AI's reply
-        reply = response['choices'][0]['message']['content']
-        
-        # Send the reply back to the user
-        bot.reply_to(message, reply)
+        bot.reply_to(message, f"شما گفتید: {message.text}")
     except Exception as e:
         bot.reply_to(message, f"مشکلی پیش آمد: {e}")
 
-# Polling
-bot.polling()
+# Webhook route
+@app.route(f"/{BOT_TOKEN}", methods=['POST'])
+def webhook():
+    update = telebot.types.Update.de_json(request.stream.read().decode("utf-8"))
+    bot.process_new_updates([update])
+    return "OK", 200
+
+# Set webhook
+if __name__ == "__main__":
+    bot.remove_webhook()
+    bot.set_webhook(url=WEBHOOK_URL + f"/{BOT_TOKEN}")
+    app.run(host="0.0.0.0", port=int(config.get("PORT", 5000)))
