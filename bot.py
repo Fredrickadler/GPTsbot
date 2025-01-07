@@ -1,43 +1,40 @@
-
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
-import openai
 import os
-from dotenv import load_dotenv
+import telebot
+from flask import Flask, request
 
-# Load API keys from .env file
-load_dotenv()
-OPENAI_API_KEY = "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"
-TELEGRAM_API_TOKEN = "8085521867:AAHf8mWjjt6Xnw0MiyxWBTVoFX_BYO71SZA"
+# متغیرهای محیطی
+BOT_TOKEN = os.getenv("BOT_TOKEN", "8085521867:AAHf8mWjjt6Xnw0MiyxWBTVoFX_BYO71SZA")
+WEBHOOK_URL = os.getenv("WEBHOOK_URL", "https://gptsbot.onrender.com")
 
-# Set OpenAI API key
-openai.api_key = OPENAI_API_KEY
+# ایجاد ربات
+bot = telebot.TeleBot(BOT_TOKEN)
 
-# Function to handle user messages
-def handle_message(update, context):
-    user_message = update.message.text  # User's message
-    try:
-        # Sending message to OpenAI and getting a response
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": user_message}]
-        )
-        reply = response['choices'][0]['message']['content']
-    except Exception as e:
-        reply = "An error occurred. Please try again later."
-    
-    update.message.reply_text(reply)  # Send reply to Telegram
+# ایجاد سرور Flask
+app = Flask(__name__)
 
-# Start the bot
-def main():
-    updater = Updater(TELEGRAM_API_TOKEN, use_context=True)
-    dp = updater.dispatcher
+# تنظیم Webhook
+@app.route(f"/{BOT_TOKEN}", methods=["POST"])
+def webhook():
+    json_data = request.get_data().decode("utf-8")
+    update = telebot.types.Update.de_json(json_data)
+    bot.process_new_updates([update])
+    return "OK", 200
 
-    # Handle text messages
-    dp.add_handler(MessageHandler(Filters.text, handle_message))
+@app.route("/", methods=["GET"])
+def index():
+    return "Bot is running!", 200
 
-    # Start polling
-    updater.start_polling()
-    updater.idle()
+# دستور نمونه برای ربات
+@bot.message_handler(commands=["start", "help"])
+def send_welcome(message):
+    bot.reply_to(message, "سلام! چطور می‌توانم کمکتان کنم؟")
+
+# راه‌اندازی Webhook
+def setup_webhook():
+    bot.remove_webhook()
+    bot.set_webhook(url=f"{WEBHOOK_URL}/{BOT_TOKEN}")
 
 if __name__ == "__main__":
-    main()
+    setup_webhook()
+    port = int(os.getenv("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
