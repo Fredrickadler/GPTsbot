@@ -1,40 +1,37 @@
 import os
 import telebot
-from flask import Flask, request
+import openai
 
-# متغیرهای محیطی
-BOT_TOKEN = os.getenv("BOT_TOKEN", "8085521867:AAHf8mWjjt6Xnw0MiyxWBTVoFX_BYO71SZA")
-WEBHOOK_URL = os.getenv("WEBHOOK_URL", "https://gptsbot.onrender.com")
+# Load API keys
+API_KEY = os.getenv("OPENAI_API_KEY")
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 
-# ایجاد ربات
+# Initialize APIs
+openai.api_key = API_KEY
 bot = telebot.TeleBot(BOT_TOKEN)
 
-# ایجاد سرور Flask
-app = Flask(__name__)
-
-# تنظیم Webhook
-@app.route(f"/{BOT_TOKEN}", methods=["POST"])
-def webhook():
-    json_data = request.get_data().decode("utf-8")
-    update = telebot.types.Update.de_json(json_data)
-    bot.process_new_updates([update])
-    return "OK", 200
-
-@app.route("/", methods=["GET"])
-def index():
-    return "Bot is running!", 200
-
-# دستور نمونه برای ربات
-@bot.message_handler(commands=["start", "help"])
+# Handle "/start" command
+@bot.message_handler(commands=['start'])
 def send_welcome(message):
-    bot.reply_to(message, "سلام! چطور می‌توانم کمکتان کنم؟")
+    bot.reply_to(message, "سلام! من اینجا هستم تا به سوالات شما پاسخ بدهم. فقط سوال خود را تایپ کنید.")
 
-# راه‌اندازی Webhook
-def setup_webhook():
-    bot.remove_webhook()
-    bot.set_webhook(url=f"{WEBHOOK_URL}/{BOT_TOKEN}")
+# Handle user messages
+@bot.message_handler(func=lambda message: True)
+def handle_message(message):
+    try:
+        # Send user message to OpenAI
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": message.text}]
+        )
+        
+        # Get the AI's reply
+        reply = response['choices'][0]['message']['content']
+        
+        # Send the reply back to the user
+        bot.reply_to(message, reply)
+    except Exception as e:
+        bot.reply_to(message, f"مشکلی پیش آمد: {e}")
 
-if __name__ == "__main__":
-    setup_webhook()
-    port = int(os.getenv("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+# Polling
+bot.polling()
