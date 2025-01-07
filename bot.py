@@ -2,12 +2,18 @@ import os
 import telebot
 import openai
 
-# Load API keys
-API_KEY = os.getenv("OPENAI_API_KEY")
-BOT_TOKEN = os.getenv("BOT_TOKEN")
+# Load environment variables from config.txt
+with open("config.txt") as f:
+    config = {}
+    for line in f:
+        key, value = line.strip().split("=", 1)
+        config[key] = value
 
 # Initialize APIs
-openai.api_key = API_KEY
+BOT_TOKEN = config["BOT_TOKEN"]
+OPENAI_API_KEY = config["OPENAI_API_KEY"]
+
+openai.api_key = OPENAI_API_KEY
 bot = telebot.TeleBot(BOT_TOKEN)
 
 # Handle "/start" command
